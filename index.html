@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Planner docente</title>
+<title>Planner lezioni</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <style>
 :root{--bg:#f3f3f0;--surf:#fff;--text:#1c1c1e;--mut:#6a6a70;--line:#d9d9d2;--acc:#12489a;--day:#4b5a6b;--today:#d9480f}
@@ -105,10 +105,12 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
   <div id="setBody"></div>
   <h3>Sincronizzazione tra dispositivi</h3>
   <div id="syncOff">
-    <p class="sub">Incolla il token GitHub per salvare i dati online e ritrovarli uguali su ogni dispositivo.</p>
-    <div class="row"><input type="password" id="tokIn" placeholder="Token GitHub (inizia con ghp_)" autocomplete="off"><button id="tokGo" class="main">Collega</button></div>
+    <p class="sub" id="syncIntro"></p>
+    <div class="row"><input type="password" id="tokIn" placeholder="Token GitHub (inizia con ghp_)" autocomplete="off"></div>
+    <div class="row"><input type="password" id="passIn" placeholder="Passphrase (almeno 8 caratteri)" autocomplete="off"><button id="tokGo" class="main">Collega</button></div>
   </div>
   <div id="syncOn" hidden>
+    <p class="sub">🔒 I dati online sono cifrati con la tua passphrase.</p>
     <p class="sub" id="syncMsg"></p>
     <div class="acts" style="justify-content:flex-start;margin-top:0"><button id="syncNow">Sincronizza ora</button><button id="syncDel">Scollega</button></div>
   </div>
@@ -253,23 +255,55 @@ $('#impFile').onchange=async e=>{
   e.target.value='';
 };
 
-// sincronizzazione tramite Gist privato di GitHub
+// sincronizzazione cifrata tramite Gist privato di GitHub
 const FN='planner-lezioni.json',SK='planner-lezioni-sync';
 let SY=(()=>{try{return JSON.parse(localStorage.getItem(SK))||{}}catch(e){return{}}})();
 const saveSY=()=>{try{localStorage.setItem(SK,JSON.stringify(SY))}catch(e){}};
-let pushT=null,dirty=false;
-const linked=()=>!!(SY.token&&SY.gistId);
+let pushT=null,dirty=false,kc=null;
+const linked=()=>!!(SY.token&&SY.gistId&&SY.pass);
+const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode(...u.subarray(i,i+8192));return btoa(s)};
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const fail=(code)=>Object.assign(new Error(code),{code});
 function setSt(t,k){const el=$('#sync');el.textContent=t;el.dataset.s=k||'';$('#syncMsg').textContent=t}
-function syncUI(){const on=linked();$('#syncOff').hidden=on;$('#syncOn').hidden=!on;if(!on)$('#sync').textContent=''}
-const errTxt=e=>e.status===401?'Token non valido o scaduto':e.status===404?'Dati online non trovati':e.status===403?'Limite GitHub raggiunto: riprova più tardi':'Senza connessione: riproverò appena possibile';
+function syncUI(){
+  const on=linked(),upg=!!(SY.token&&!SY.pass);
+  $('#syncOff').hidden=on;$('#syncOn').hidden=!on;
+  $('#syncIntro').textContent=upg?'Aggiornamento: scegli una passphrase per cifrare i dati online. Il token è già memorizzato, quindi puoi lasciare vuoto il relativo campo.':'Incolla il token GitHub e scegli una passphrase: i dati online vengono cifrati e nemmeno GitHub può leggerli. Su ogni dispositivo usa lo stesso token e la stessa passphrase. Se la dimentichi, i dati online non si possono recuperare.';
+  if(!on){const el=$('#sync');el.textContent=upg?'Sincronizzazione: aggiungi la passphrase (Orario)':'';el.dataset.s=upg?'err':''}
+}
+const errTxt=e=>e.name==='OperationError'?'Passphrase errata':e.code==='nocrypto'?'Il browser non supporta la cifratura (serve una pagina https)':e.code==='mismatch'?'Le due passphrase non coincidono':e.status===401?'Token non valido o senza il permesso "gist"':e.status===404?'Dati online non trovati':e.status===403?'Limite GitHub raggiunto: riprova più tardi':'Senza connessione: riproverò appena possibile';
 async function gh(path,opt={}){
   const r=await fetch('https://api.github.com'+path+(path.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store',...opt,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+SY.token,'Content-Type':'application/json'}});
   if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e}
   return r.json();
 }
+// cifratura AES-GCM con chiave derivata dalla passphrase (PBKDF2)
+async function getKey(salt){
+  const sub=window.crypto&&window.crypto.subtle;if(!sub)throw fail('nocrypto');
+  const id=SY.pass+'|'+salt;if(kc&&kc.id===id)return kc.key;
+  const base=await sub.importKey('raw',new TextEncoder().encode(SY.pass),'PBKDF2',false,['deriveKey']);
+  const key=await sub.deriveKey({name:'PBKDF2',salt:unb64(salt),iterations:200000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+  kc={id,key};return key;
+}
+async function pack(){
+  if(!SY.salt){SY.salt=b64(crypto.getRandomValues(new Uint8Array(16)));saveSY()}
+  const key=await getKey(SY.salt),iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(S))));
+  return JSON.stringify({v:1,enc:1,ts:S.ts||0,salt:SY.salt,iv:b64(iv),data:b64(ct)});
+}
+async function unpack(str){
+  let o;try{o=JSON.parse(str)}catch(x){return null}
+  if(o&&o.enc){
+    const key=await getKey(o.salt);
+    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.data));
+    SY.salt=o.salt;saveSY();
+    const d=JSON.parse(new TextDecoder().decode(pt));return Array.isArray(d.classes)?d:null;
+  }
+  return o&&Array.isArray(o.classes)?o:null; // vecchio formato non cifrato
+}
 async function push(){
   if(!linked())return;clearTimeout(pushT);setSt('Salvo online…');
-  try{await gh('/gists/'+SY.gistId,{method:'PATCH',body:JSON.stringify({files:{[FN]:{content:JSON.stringify(S)}}})});dirty=false;setSt('Sincronizzato ✓','ok')}
+  try{await gh('/gists/'+SY.gistId,{method:'PATCH',body:JSON.stringify({files:{[FN]:{content:await pack()}}})});dirty=false;setSt('Sincronizzato ✓','ok')}
   catch(e){setSt(errTxt(e),'err')}
 }
 function queuePush(){if(!linked())return;dirty=true;setSt('Da salvare online…');clearTimeout(pushT);pushT=setTimeout(push,1500)}
@@ -278,44 +312,48 @@ async function pull(){
   if(dirty){await push();return}
   try{
     const g=await gh('/gists/'+SY.gistId),f=g.files&&g.files[FN];
-    let rem=null;try{rem=JSON.parse(f.content)}catch(x){}
-    if(!rem||!Array.isArray(rem.classes)){setSt('Dati online non validi','err');return}
-    if((rem.ts||0)>(S.ts||0)){S=mig(rem);saveLocal();render();if($('#dSet').open)renderSet();setSt('Sincronizzato ✓','ok')}
-    else if((S.ts||0)>(rem.ts||0))await push();
-    else setSt('Sincronizzato ✓','ok');
+    const rem=f?await unpack(f.content):null;
+    if(!rem){setSt('Dati online non validi','err');return}
+    let legacy=false;try{legacy=!JSON.parse(f.content).enc}catch(x){}
+    if((rem.ts||0)>(S.ts||0)){S=mig(rem);saveLocal();render();if($('#dSet').open)renderSet()}
+    if((S.ts||0)>(rem.ts||0)||legacy)await push();else setSt('Sincronizzato ✓','ok');
   }catch(e){setSt(errTxt(e),'err')}
 }
-async function connect(tok){
-  SY={token:tok};
+async function connect(tok,pass){
+  const prev=SY;SY={token:tok,pass};
   try{
     const list=await gh('/gists?per_page=100'),g=list.find(x=>x.files&&x.files[FN]);
-    let useRemote=false;
+    let useRemote=false,legacy=false;
     if(g){
       SY.gistId=g.id;
-      const full=await gh('/gists/'+g.id);let rem=null;
-      try{rem=JSON.parse(full.files[FN].content)}catch(x){}
-      if(rem&&Array.isArray(rem.classes)){
-        const localHas=S.classes.length||S.sched.length;
-        useRemote=!localHas||confirm('Online ci sono già dei dati salvati.\n\nOK = usa quelli online (sostituiscono quelli di questo dispositivo).\nAnnulla = tieni quelli di questo dispositivo e sostituisci quelli online.');
+      const full=await gh('/gists/'+g.id);
+      const rem=await unpack(full.files[FN].content);
+      try{legacy=!JSON.parse(full.files[FN].content).enc}catch(x){}
+      if(rem){
+        const same=prev.token===tok&&prev.gistId===g.id,localHas=S.classes.length||S.sched.length;
+        useRemote=same?(rem.ts||0)>(S.ts||0):(!localHas||confirm('Online ci sono già dei dati salvati.\n\nOK = usa quelli online (sostituiscono quelli di questo dispositivo).\nAnnulla = tieni quelli di questo dispositivo e sostituisci quelli online.'));
         if(useRemote){S=mig(rem);saveLocal();render();renderSet()}
       }
     }else{
+      if(prompt('Primo collegamento: riscrivi la passphrase per conferma.')!==pass)throw fail('mismatch');
       S.ts=S.ts||Date.now();
-      const c=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Planner lezioni (dati)',public:false,files:{[FN]:{content:JSON.stringify(S)}}})});
+      const c=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Planner lezioni (dati)',public:false,files:{[FN]:{content:await pack()}}})});
       SY.gistId=c.id;useRemote=true;
     }
     saveSY();syncUI();
-    if(useRemote)setSt('Sincronizzato ✓','ok');
-    else{S.ts=Date.now();saveLocal();await push()}
+    if(useRemote&&!legacy)setSt('Sincronizzato ✓','ok');
+    else{if(!useRemote){S.ts=Date.now();saveLocal()}await push()}
     return true;
-  }catch(e){SY={};saveSY();syncUI();alert(errTxt(e)+'. Controlla di aver incollato il token completo e che abbia il permesso "gist".')}
+  }catch(e){SY=prev;syncUI();alert(errTxt(e))}
 }
 $('#tokGo').onclick=async()=>{
-  const t=$('#tokIn').value.trim();if(!t){alert('Incolla prima il token.');return}
-  if(await connect(t))$('#tokIn').value='';
+  const t=$('#tokIn').value.trim()||SY.token||'',pw=$('#passIn').value;
+  if(!t){alert('Incolla prima il token.');return}
+  if(pw.length<8){alert('La passphrase deve avere almeno 8 caratteri.');return}
+  if(await connect(t,pw)){$('#tokIn').value='';$('#passIn').value=''}
 };
 $('#syncNow').onclick=()=>pull();
-$('#syncDel').onclick=()=>{if(confirm('Scollegare questo dispositivo? I dati online restano su GitHub e questo dispositivo conserva i suoi.')){SY={};saveSY();syncUI()}};
+$('#syncDel').onclick=()=>{if(confirm('Scollegare questo dispositivo? I dati online restano su GitHub (cifrati) e questo dispositivo conserva i suoi.')){SY={};saveSY();syncUI()}};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()});
 addEventListener('online',pull);
 setInterval(()=>{if(!document.hidden&&!dirty)pull()},120000);
