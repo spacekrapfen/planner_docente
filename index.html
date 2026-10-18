@@ -229,7 +229,7 @@ function render(){
   DN.forEach((n,i)=>{
     const d=ymd(addDays(wk,i)),on=i===sel?'on':'';
     if(S.days.includes(i))html+=`<div class="dn ${on}" style="grid-column:${i+1};grid-row:${endRow}"><label for="dn${i}">Riunioni e altro</label><textarea id="dn${i}" data-d="${d}" rows="3">${esc(S.dayNotes[d]||'')}</textarea></div>`;
-    else html+=`<div class="offcol ${on}" style="grid-column:${i+1};grid-row:2 / ${endRow+1}">Giorno non lavorativo</div>`;
+    else html+=`<div class="offcol ${on}" style="grid-column:${i+1};grid-row:2 / ${endRow+1}">Relax, oggi non si lavora!</div>`;
   });
   $('#week').style.setProperty('--cols',DN.map((n,i)=>S.days.includes(i)?'minmax(0,1fr)':'minmax(0,.3fr)').join(' '));
   $('#week').innerHTML=html;
