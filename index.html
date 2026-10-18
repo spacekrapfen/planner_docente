@@ -24,17 +24,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .tabs button.on{background:var(--day);color:#fff}
 .tabs button.today{border-top-color:var(--today);color:var(--today);font-weight:700}
 .tabs button.today.on{background:var(--today);color:#fff}
-#week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.6rem;padding:1rem}
-.day h3{margin:0 0 .5rem;padding:.4rem .6rem;background:var(--day);color:#fff;border-radius:6px;display:flex;justify-content:space-between;align-items:baseline;font-size:1rem;font-weight:600}
-.day h3 b{font-weight:500;opacity:.9}
-.day.today h3{background:var(--today);box-shadow:0 0 0 3px color-mix(in srgb,var(--today) 30%,transparent)}
-.les{display:block;width:100%;text-align:left;margin:0 0 .45rem;padding:.5rem .6rem;border:1px solid var(--line);border-left:6px solid var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surf));border-radius:8px}
+#week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.45rem .6rem;padding:1rem}
+.dh{margin:0;padding:.4rem .6rem;background:var(--day);color:#fff;border-radius:6px;display:flex;justify-content:space-between;align-items:baseline;font-size:1rem;font-weight:600}
+.dh b{font-weight:500;opacity:.9}
+.dh.today{background:var(--today);box-shadow:0 0 0 3px color-mix(in srgb,var(--today) 30%,transparent)}
+.les{display:flex;flex-direction:column;justify-content:flex-start;width:100%;text-align:left;margin:0;padding:.5rem .6rem;border:1px solid var(--line);border-left:6px solid var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surf));border-radius:8px}
 .les .t{font-size:.78rem;color:var(--mut);font-variant-numeric:tabular-nums}
 .les .n{font-weight:700}
 .les .a{font-size:.88rem;margin-top:.2rem;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .les .a.ph{color:var(--mut);font-style:italic}
 .les.done .n::after{content:" ✓";color:var(--acc)}
-.empty{color:var(--mut);font-size:.9rem;padding:.3rem .2rem}
+.empty{color:var(--mut);font-size:.9rem;padding:.3rem .2rem;margin:0}
 .wn{margin:0 1rem 1.5rem}
 .wn label{font-weight:600;display:block;margin-bottom:.3rem}
 textarea{width:100%;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:.6rem;resize:vertical}
@@ -48,7 +48,7 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
 .acts .main,.main{background:var(--acc);color:#fff;border-color:var(--acc)}
 .row{display:flex;gap:.4rem;margin-bottom:.4rem;align-items:center;flex-wrap:wrap}
 .row .end{color:var(--mut);font-variant-numeric:tabular-nums;font-size:.9rem}
-.brk{display:flex;justify-content:space-between;gap:.5rem;margin:0 0 .45rem;padding:.3rem .6rem;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-size:.8rem}
+.brk{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin:0;padding:.3rem .6rem;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-size:.8rem}
 .row input[type=text],.row input[type=password],.row input:not([type]){flex:1;min-width:7rem}
 .row input,.row select{background:var(--surf);border:1px solid var(--line);border-radius:6px;padding:.35rem .4rem}
 .row input[type=color]{width:2.6rem;height:2.2rem;padding:2px;flex:none}
@@ -56,17 +56,18 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
 .sync{font-size:.8rem;color:var(--mut)}
 .sync[data-s=ok]{color:#2a8a4a}
 .sync[data-s=err]{color:var(--today);font-weight:600}
-.hint{background:var(--surf);border:1px dashed var(--line);border-radius:10px;padding:1rem;margin:1rem;color:var(--mut)}
-@media (max-width:820px){
+.hint{background:var(--surf);border:1px dashed var(--line);border-radius:10px;padding:1rem;margin:0;color:var(--mut)}
+@media screen and (max-width:820px){
  .tabs{display:flex}
  #week{grid-template-columns:1fr;padding-top:.8rem}
- .day{display:none}.day.on{display:block}
- .day h3{display:none}
+ #week>:not(.hint){display:none;grid-column:1!important;grid-row:auto!important}
+ #week>.on{display:flex}
+ #week>.empty.on{display:block}
  .nav b{min-width:0;flex:1}
  .nav{flex:1 1 100%;order:3;justify-content:space-between}
  .les{padding:.75rem .8rem}
 }
-@media print{.top,.tabs,.acts,button{display:none!important}.day{display:block!important}#week{grid-template-columns:repeat(4,1fr)}}
+@media print{.top,.tabs{display:none!important}#week{padding:0}.les{break-inside:avoid}}
 </style>
 </head>
 <body>
@@ -157,15 +158,28 @@ function render(){
   $('#title').textContent=wk.getMonth()===end.getMonth()?`${wk.getDate()} – ${end.getDate()} ${m2}`:`${wk.getDate()} ${m1} – ${end.getDate()} ${m2}`;
   $('#tabs').innerHTML=DS.map((n,i)=>`<button class="${i===sel?'on':''} ${ymd(addDays(wk,i))===todayK?'today':''}" data-i="${i}">${n}<br><b>${addDays(wk,i).getDate()}</b></button>`).join('');
   const wn=S.notes[key]||{};
-  let html=S.classes.length&&S.sched.length?'':'<div class="hint" style="grid-column:1/-1">Nessun orario ancora. Premi <b>Orario</b> in alto per creare le classi e inserire le lezioni della settimana.</div>';
-  html+=DN.map((n,i)=>{
-    const d=addDays(wk,i);
-    const es=S.sched.filter(e=>e.day===i&&cls(e.cls)).sort(byTime);
-    const lo=es.length?es[0].start:'',hi=es.length?fm(Math.max(...es.map(e=>tm(e.start)+e.n*S.mod))):'';
-    const items=[...es,...S.breaks.filter(b=>es.length&&b.start>lo&&b.start<hi).map(b=>({...b,brk:1}))].sort(byTime);
-    const cards=items.map(e=>{if(e.brk)return `<div class="brk"><span>${esc(e.label||'Ricreazione')}</span><span>${e.start}–${fm(tm(e.start)+e.dur)}</span></div>`;const c=cls(e.cls),x=wn[e.id]||{};
-      return `<button class="les ${x.d?'done':''}" style="--c:${c.color}" data-id="${e.id}"><div class="t">${e.start}–${endOf(e)}</div><div class="n">${esc(c.name)}</div><div class="a ${x.t?'':'ph'}">${x.t?esc(x.t):'+ attività'}</div></button>`}).join('');
-    return `<section class="day ${i===sel?'on':''} ${ymd(d)===todayK?'today':''}"><h3><span>${n}</span><b>${d.getDate()}</b></h3>${cards||'<p class="empty">Nessuna lezione</p>'}</section>`}).join('');
+  let html=DN.map((n,i)=>{const d=addDays(wk,i);return `<h3 class="dh ${ymd(d)===todayK?'today':''}" style="grid-column:${i+1};grid-row:1"><span>${n}</span><b>${d.getDate()}</b></h3>`}).join('');
+  if(!(S.classes.length&&S.sched.length))html+='<div class="hint" style="grid-column:1/-1;grid-row:2">Nessun orario ancora. Premi <b>Orario</b> in alto per creare le classi e inserire le lezioni della settimana.</div>';
+  else{
+    // una riga della griglia per ogni orario di inizio: le lezioni alla stessa ora restano allineate tra i giorni
+    const cells=[],empty=[];
+    DN.forEach((n,i)=>{
+      const es=S.sched.filter(e=>e.day===i&&cls(e.cls));
+      if(!es.length){empty.push(i);return}
+      const lo=es.reduce((m,e)=>e.start<m?e.start:m,'99:99'),hi=fm(Math.max(...es.map(e=>tm(e.start)+e.n*S.mod)));
+      es.forEach(e=>cells.push({i,t:e.start,k:'b',e}));
+      S.breaks.filter(b=>b.start>lo&&b.start<hi).forEach(b=>cells.push({i,t:b.start,k:'a',b}));
+    });
+    const kk=c=>c.t+'|'+c.k;
+    cells.sort((x,y)=>kk(x)<kk(y)?-1:kk(x)>kk(y)?1:x.i-y.i);
+    const rows=[...new Set(cells.map(kk))];
+    html+=cells.map(c=>{
+      const st=`grid-column:${c.i+1};grid-row:${rows.indexOf(kk(c))+2}`,on=c.i===sel?'on':'';
+      if(c.b)return `<div class="brk ${on}" style="${st}"><span>${esc(c.b.label||'Ricreazione')}</span><span>${c.b.start}–${fm(tm(c.b.start)+c.b.dur)}</span></div>`;
+      const e=c.e,cl=cls(e.cls),x=wn[e.id]||{};
+      return `<button class="les ${x.d?'done':''} ${on}" style="--c:${cl.color};${st}" data-id="${e.id}"><div class="t">${e.start}–${endOf(e)}</div><div class="n">${esc(cl.name)}</div><div class="a ${x.t?'':'ph'}">${x.t?esc(x.t):'+ attività'}</div></button>`}).join('');
+    html+=empty.map(i=>`<p class="empty ${i===sel?'on':''}" style="grid-column:${i+1};grid-row:2">Nessuna lezione</p>`).join('');
+  }
   $('#week').innerHTML=html;
   $('#wnote').value=S.weekNotes[key]||'';
 }
