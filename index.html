@@ -53,6 +53,7 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
 .row input,.row select{background:var(--surf);border:1px solid var(--line);border-radius:6px;padding:.35rem .4rem}
 .row input[type=color]{width:2.6rem;height:2.2rem;padding:2px;flex:none}
 .chk{display:flex;gap:.5rem;align-items:center;margin-top:.7rem}
+.ico{display:inline-flex;align-items:center;padding:.45rem .55rem}
 .sync{font-size:.8rem;color:var(--mut)}
 .sync[data-s=ok]{color:#2a8a4a}
 .sync[data-s=err]{color:var(--today);font-weight:600}
@@ -81,6 +82,7 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
   </div>
   <button id="today">Oggi</button>
   <button id="openSet">Orario</button>
+  <button id="openCfg" class="ico" aria-label="Impostazioni" title="Impostazioni"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 </header>
 <nav class="tabs" id="tabs"></nav>
 <main id="week"></main>
@@ -104,6 +106,11 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
   <h2>Orario settimanale</h2>
   <p class="sub">Ogni nuova settimana parte da questo orario. Le modifiche si salvano da sole.</p>
   <div id="setBody"></div>
+  <div class="acts"><button id="setClose" class="main">Chiudi</button></div>
+</dialog>
+
+<dialog id="dCfg">
+  <h2>Impostazioni</h2>
   <h3>Sincronizzazione tra dispositivi</h3>
   <div id="syncOff">
     <p class="sub" id="syncIntro"></p>
@@ -122,7 +129,7 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
     <button id="imp">Importa backup</button>
     <input type="file" id="impFile" accept="application/json" hidden>
   </div>
-  <div class="acts"><button id="setClose" class="main">Chiudi</button></div>
+  <div class="acts"><button id="cfgClose" class="main">Chiudi</button></div>
 </dialog>
 
 <script>
@@ -149,7 +156,17 @@ function save(){S.ts=Date.now();saveLocal();queuePush()}
 
 let wk=mon(new Date()), sel=(new Date().getDay()+6)%7, cur=null;
 const cls=id=>S.classes.find(c=>c.id===id);
-const endOf=e=>fm(tm(e.start)+e.n*S.mod);
+// una lezione di più moduli si divide in parti se una pausa inizia esattamente dove finisce un modulo
+function parts(e){
+  const out=[];let s=tm(e.start),ps=s,m0=0;
+  for(let k=0;k<e.n;k++){
+    const me=s+S.mod,b=k<e.n-1&&S.breaks.find(x=>tm(x.start)===me);
+    if(b){out.push({s:ps,e:me,m0,m1:k});s=me+b.dur;ps=s;m0=k+1}else s=me;
+  }
+  out.push({s:ps,e:s,m0,m1:e.n-1});
+  return out;
+}
+const endOf=e=>{const p=parts(e);return fm(p[p.length-1].e)};
 const byTime=(a,b)=>a.start.localeCompare(b.start);
 
 function render(){
@@ -161,23 +178,32 @@ function render(){
   let html=DN.map((n,i)=>{const d=addDays(wk,i);return `<h3 class="dh ${ymd(d)===todayK?'today':''}" style="grid-column:${i+1};grid-row:1"><span>${n}</span><b>${d.getDate()}</b></h3>`}).join('');
   if(!(S.classes.length&&S.sched.length))html+='<div class="hint" style="grid-column:1/-1;grid-row:2">Nessun orario ancora. Premi <b>Orario</b> in alto per creare le classi e inserire le lezioni della settimana.</div>';
   else{
-    // una riga della griglia per ogni orario di inizio: le lezioni alla stessa ora restano allineate tra i giorni
-    const cells=[],empty=[];
+    // una riga della griglia per ogni inizio di modulo: le lezioni alla stessa ora restano allineate tra i giorni
+    const cells=[],empty=[],keys=new Set(),kk=(t,k)=>t+'|'+k;
     DN.forEach((n,i)=>{
       const es=S.sched.filter(e=>e.day===i&&cls(e.cls));
       if(!es.length){empty.push(i);return}
-      const lo=es.reduce((m,e)=>e.start<m?e.start:m,'99:99'),hi=fm(Math.max(...es.map(e=>tm(e.start)+e.n*S.mod)));
-      es.forEach(e=>cells.push({i,t:e.start,k:'b',e}));
-      S.breaks.filter(b=>b.start>lo&&b.start<hi).forEach(b=>cells.push({i,t:b.start,k:'a',b}));
+      let lo=1e9,hi=0;
+      es.forEach(e=>{
+        const ps=parts(e);lo=Math.min(lo,ps[0].s);hi=Math.max(hi,ps[ps.length-1].e);
+        ps.forEach((p,pi)=>{
+          const nm=p.m1-p.m0+1;
+          for(let j=0;j<nm;j++)keys.add(kk(fm(p.s+j*S.mod),'b'));
+          cells.push({i,e,p,pi,t0:fm(p.s),t1:fm(p.s+(nm-1)*S.mod)});
+        });
+      });
+      S.breaks.forEach(b=>{const t=tm(b.start);if(t>lo&&t<hi){keys.add(kk(b.start,'a'));cells.push({i,b})}});
     });
-    const kk=c=>c.t+'|'+c.k;
-    cells.sort((x,y)=>kk(x)<kk(y)?-1:kk(x)>kk(y)?1:x.i-y.i);
-    const rows=[...new Set(cells.map(kk))];
+    const rows=[...keys].sort(),ri=k=>rows.indexOf(k)+2;
+    const ck=c=>c.b?kk(c.b.start,'a'):kk(c.t0,'b');
+    cells.sort((x,y)=>ck(x)<ck(y)?-1:ck(x)>ck(y)?1:x.i-y.i);
     html+=cells.map(c=>{
-      const st=`grid-column:${c.i+1};grid-row:${rows.indexOf(kk(c))+2}`,on=c.i===sel?'on':'';
-      if(c.b)return `<div class="brk ${on}" style="${st}"><span>${esc(c.b.label||'Ricreazione')}</span><span>${c.b.start}–${fm(tm(c.b.start)+c.b.dur)}</span></div>`;
-      const e=c.e,cl=cls(e.cls),x=wn[e.id]||{};
-      return `<button class="les ${x.d?'done':''} ${on}" style="--c:${cl.color};${st}" data-id="${e.id}"><div class="t">${e.start}–${endOf(e)}</div><div class="n">${esc(cl.name)}</div><div class="a ${x.t?'':'ph'}">${x.t?esc(x.t):'+ attività'}</div></button>`}).join('');
+      const on=c.i===sel?'on':'',col=`grid-column:${c.i+1}`;
+      if(c.b)return `<div class="brk ${on}" style="${col};grid-row:${ri(ck(c))}"><span>${esc(c.b.label||'Ricreazione')}</span><span>${c.b.start}–${fm(tm(c.b.start)+c.b.dur)}</span></div>`;
+      const {e,p}=c,cl=cls(e.cls),x=wn[e.id]||{},r0=ri(kk(c.t0,'b')),r1=ri(kk(c.t1,'b'));
+      const mod=e.n>1?` · mod. ${p.m0===p.m1?p.m0+1:(p.m0+1)+'–'+(p.m1+1)}/${e.n}`:'';
+      const act=c.pi>0?'continua':x.t?esc(x.t):'+ attività';
+      return `<button class="les ${x.d?'done':''} ${on}" style="--c:${cl.color};${col};grid-row:${r0} / span ${r1-r0+1}" data-id="${e.id}"><div class="t">${fm(p.s)}–${fm(p.e)}${mod}</div><div class="n">${esc(cl.name)}</div><div class="a ${c.pi>0||!x.t?'ph':''}">${act}</div></button>`}).join('');
     html+=empty.map(i=>`<p class="empty ${i===sel?'on':''}" style="grid-column:${i+1};grid-row:2">Nessuna lezione</p>`).join('');
   }
   $('#week').innerHTML=html;
@@ -212,7 +238,7 @@ $('#lSave').onclick=()=>{
 function renderSet(){
   const opts=sel=>S.classes.map(c=>`<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name||'(senza nome)')}</option>`).join('');
   const nopt=n=>[1,2,3,4].map(k=>`<option value="${k}" ${k===n?'selected':''}>${k} ${k>1?'moduli':'modulo'}</option>`).join('');
-  $('#setBody').innerHTML=`<h3>Durata del modulo</h3><div class="row"><input type="number" id="modIn" min="10" max="180" step="5" value="${S.mod}" style="max-width:6rem"><span>minuti per ogni modulo. Le lezioni durano sempre un multiplo di questo valore.</span></div>`+
+  $('#setBody').innerHTML=`<h3>Durata del modulo</h3><div class="row"><input type="number" id="modIn" min="10" max="180" step="5" value="${S.mod}" style="max-width:6rem"><span>minuti per ogni modulo. Le lezioni durano un multiplo di questo valore; se una lezione di più moduli arriva a una pausa, si interrompe e riprende dopo.</span></div>`+
     `<h3>Classi e materie</h3>`+
     S.classes.map(c=>`<div class="row" data-c="${c.id}"><input type="color" value="${c.color}" data-f="color" aria-label="Colore"><input type="text" value="${esc(c.name)}" data-f="name" placeholder="es. 3A Storia"><button data-del="c" aria-label="Elimina">✕</button></div>`).join('')+
     `<button data-addc>+ Aggiungi classe</button><h3>Lezioni per giorno</h3>`+
@@ -223,6 +249,8 @@ function renderSet(){
 }
 $('#openSet').onclick=()=>{renderSet();$('#dSet').showModal()};
 $('#setClose').onclick=()=>$('#dSet').close();
+$('#openCfg').onclick=()=>$('#dCfg').showModal();
+$('#cfgClose').onclick=()=>$('#dCfg').close();
 $('#dSet').addEventListener('close',render);
 $('#setBody').addEventListener('input',e=>{
   if(e.target.id==='modIn'){const v=+e.target.value;if(v>=10&&v<=180){S.mod=v;save()}return}
@@ -283,7 +311,7 @@ function syncUI(){
   const on=linked(),upg=!!(SY.token&&!SY.pass);
   $('#syncOff').hidden=on;$('#syncOn').hidden=!on;
   $('#syncIntro').textContent=upg?'Aggiornamento: scegli una passphrase per cifrare i dati online. Il token è già memorizzato, quindi puoi lasciare vuoto il relativo campo.':'Incolla il token GitHub e scegli una passphrase: i dati online vengono cifrati e nemmeno GitHub può leggerli. Su ogni dispositivo usa lo stesso token e la stessa passphrase. Se la dimentichi, i dati online non si possono recuperare.';
-  if(!on){const el=$('#sync');el.textContent=upg?'Sincronizzazione: aggiungi la passphrase (Orario)':'';el.dataset.s=upg?'err':''}
+  if(!on){const el=$('#sync');el.textContent=upg?'Sincronizzazione: aggiungi la passphrase (Impostazioni)':'';el.dataset.s=upg?'err':''}
 }
 const errTxt=e=>e.name==='OperationError'?'Passphrase errata':e.code==='nocrypto'?'Il browser non supporta la cifratura (serve una pagina https)':e.code==='mismatch'?'Le due passphrase non coincidono':e.status===401?'Token non valido o senza il permesso "gist"':e.status===404?'Dati online non trovati':e.status===403?'Limite GitHub raggiunto: riprova più tardi':'Senza connessione: riproverò appena possibile';
 async function gh(path,opt={}){
