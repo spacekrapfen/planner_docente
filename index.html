@@ -6,8 +6,8 @@
 <title>Planner lezioni</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <style>
-:root{--bg:#f3f3f0;--surf:#fff;--text:#1c1c1e;--mut:#6a6a70;--line:#d9d9d2;--acc:#12489a;--day:#4b5a6b;--today:#d9480f}
-@media (prefers-color-scheme:dark){:root{--bg:#161618;--surf:#212124;--text:#f0f0f2;--mut:#9a9aa2;--line:#38383d;--acc:#6ea8ff;--day:#46546a;--today:#e8590c}}
+:root{--bg:#f3f3f0;--surf:#fff;--text:#1c1c1e;--mut:#6a6a70;--line:#d9d9d2;--acc:#12489a;--day:#4b5a6b;--today:#d9480f;--onacc:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#161618;--surf:#212124;--text:#f0f0f2;--mut:#9a9aa2;--line:#38383d;--acc:#6ea8ff;--day:#46546a;--today:#e8590c;--onacc:#0b1220}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--text);font:16px/1.4 "Avenir Next","Segoe UI",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -24,9 +24,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .tabs button.on{background:var(--day);color:#fff}
 .tabs button.today{border-top-color:var(--today);color:var(--today);font-weight:700}
 .tabs button.today.on{background:var(--today);color:#fff}
-#week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.45rem .6rem;padding:1rem}
+#week{display:grid;grid-template-columns:var(--cols,repeat(7,minmax(0,1fr)));gap:.45rem .6rem;padding:1rem}
 .dh{margin:0;padding:.4rem .6rem;background:var(--day);color:#fff;border-radius:6px;display:flex;justify-content:space-between;align-items:baseline;font-size:1rem;font-weight:600}
 .dh b{font-weight:500;opacity:.9}
+.dh.off{padding:.4rem .35rem;font-size:.8rem;background:color-mix(in srgb,var(--day) 55%,var(--bg))}
+.dn{display:flex;flex-direction:column;gap:.25rem;align-self:start}
+.dn label{font-size:.8rem;font-weight:600;color:var(--mut)}
+.dn textarea{padding:.4rem;font-size:.9rem}
+.offcol{background:color-mix(in srgb,var(--day) 9%,transparent);border-radius:8px;color:var(--mut);font-size:.8rem;writing-mode:vertical-rl;text-align:center;padding:.6rem 0}
+.eye{vertical-align:-2px;margin-left:.35rem;color:var(--acc)}
+.brk.watch{border-style:solid;border-color:var(--acc);color:var(--text)}
+.chips{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin:.2rem 0 .6rem}
+.chips button{padding:.25rem .55rem;font-size:.85rem}
+.chips button.on{background:var(--acc);color:var(--onacc);border-color:var(--acc)}
+.chips .lb{font-size:.85rem;color:var(--mut);margin-right:.2rem}
+.tabs button.off{flex:.55;opacity:.7}
 .dh.today{background:var(--today);box-shadow:0 0 0 3px color-mix(in srgb,var(--today) 30%,transparent)}
 .les{display:flex;flex-direction:column;justify-content:flex-start;width:100%;text-align:left;margin:0;padding:.5rem .6rem;border:1px solid var(--line);border-left:6px solid var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surf));border-radius:8px}
 .les .t{font-size:.78rem;color:var(--mut);font-variant-numeric:tabular-nums}
@@ -45,7 +57,7 @@ dialog h3{margin:1.2rem 0 .4rem;font-size:1rem}
 dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
 .sub{color:var(--mut);margin:0 0 .8rem;font-size:.9rem}
 .acts{display:flex;gap:.5rem;justify-content:flex-end;margin-top:.8rem;flex-wrap:wrap}
-.acts .main,.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+.acts .main,.main{background:var(--acc);color:var(--onacc);border-color:var(--acc)}
 .row{display:flex;gap:.4rem;margin-bottom:.4rem;align-items:center;flex-wrap:wrap}
 .row .end{color:var(--mut);font-variant-numeric:tabular-nums;font-size:.9rem}
 .brk{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin:0;padding:.3rem .6rem;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-size:.8rem}
@@ -64,6 +76,7 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
  #week>:not(.hint){display:none;grid-column:1!important;grid-row:auto!important}
  #week>.on{display:flex}
  #week>.empty.on{display:block}
+ #week>.offcol.on{display:block;writing-mode:horizontal-tb;padding:.8rem}
  .nav b{min-width:0;flex:1}
  .nav{flex:1 1 100%;order:3;justify-content:space-between}
  .les{padding:.75rem .8rem}
@@ -136,6 +149,7 @@ dialog h4{margin:.8rem 0 .3rem;font-size:.9rem;color:var(--mut)}
 const DN=['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
 const DS=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
 const PAL=['#2f80ed','#27ae60','#f2994a','#bb6bd9','#eb5757','#00a6a6','#c0a000','#6c7a89'];
+const EYE='<svg class="eye" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Sorveglianza"><title>Sorveglianza</title><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 const K='planner-lezioni-v1';
 const $=s=>document.querySelector(s);
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -148,7 +162,10 @@ const tm=t=>{const[h,m]=String(t||'0:0').split(':');return +h*60+ +m};
 const fm=m=>{m=Math.max(0,Math.min(1439,Math.round(m)));return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
 function mig(j){const o={notes:{},weekNotes:{},sched:[],breaks:[],...j};
   if(!o.mod){o.mod=50;o.sched.forEach(e=>{if(!e.n)e.n=Math.max(1,Math.round((tm(e.end)-tm(e.start))/60))})}
-  o.sched.forEach(e=>{if(!e.n)e.n=1});return o}
+  o.sched.forEach(e=>{if(!e.n)e.n=1});
+  if(!Array.isArray(o.days))o.days=[...new Set([0,1,2,3,4,...o.sched.map(e=>e.day)])];
+  o.days.sort((a,b)=>a-b);o.dayNotes=o.dayNotes||{};
+  o.breaks.forEach(b=>{if(!Array.isArray(b.watch))b.watch=[]});return o}
 function load(){try{const j=JSON.parse(localStorage.getItem(K));if(j&&Array.isArray(j.classes))return mig(j)}catch(e){}return mig({classes:[]})}
 let S=load();
 function saveLocal(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
@@ -173,14 +190,16 @@ function render(){
   const key=ymd(wk), end=addDays(wk,6), todayK=ymd(new Date());
   const m1=wk.toLocaleDateString('it-IT',{month:'short'}), m2=end.toLocaleDateString('it-IT',{month:'short',year:'numeric'});
   $('#title').textContent=wk.getMonth()===end.getMonth()?`${wk.getDate()} – ${end.getDate()} ${m2}`:`${wk.getDate()} ${m1} – ${end.getDate()} ${m2}`;
-  $('#tabs').innerHTML=DS.map((n,i)=>`<button class="${i===sel?'on':''} ${ymd(addDays(wk,i))===todayK?'today':''}" data-i="${i}">${n}<br><b>${addDays(wk,i).getDate()}</b></button>`).join('');
+  $('#tabs').innerHTML=DS.map((n,i)=>`<button class="${i===sel?'on':''} ${ymd(addDays(wk,i))===todayK?'today':''} ${S.days.includes(i)?'':'off'}" data-i="${i}">${n}<br><b>${addDays(wk,i).getDate()}</b></button>`).join('');
   const wn=S.notes[key]||{};
-  let html=DN.map((n,i)=>{const d=addDays(wk,i);return `<h3 class="dh ${ymd(d)===todayK?'today':''}" style="grid-column:${i+1};grid-row:1"><span>${n}</span><b>${d.getDate()}</b></h3>`}).join('');
+  let html=DN.map((n,i)=>{const d=addDays(wk,i),off=!S.days.includes(i);return `<h3 class="dh ${ymd(d)===todayK?'today':''} ${off?'off':''}" style="grid-column:${i+1};grid-row:1"><span>${off?DS[i]:n}</span><b>${d.getDate()}</b></h3>`}).join('');
+  let endRow=3;
   if(!(S.classes.length&&S.sched.length))html+='<div class="hint" style="grid-column:1/-1;grid-row:2">Nessun orario ancora. Premi <b>Orario</b> in alto per creare le classi e inserire le lezioni della settimana.</div>';
   else{
     // una riga della griglia per ogni inizio di modulo: le lezioni alla stessa ora restano allineate tra i giorni
     const cells=[],empty=[],keys=new Set(),kk=(t,k)=>t+'|'+k;
     DN.forEach((n,i)=>{
+      if(!S.days.includes(i))return;
       const es=S.sched.filter(e=>e.day===i&&cls(e.cls));
       if(!es.length){empty.push(i);return}
       let lo=1e9,hi=0;
@@ -195,17 +214,24 @@ function render(){
       S.breaks.forEach(b=>{const t=tm(b.start);if(t>lo&&t<hi){keys.add(kk(b.start,'a'));cells.push({i,b})}});
     });
     const rows=[...keys].sort(),ri=k=>rows.indexOf(k)+2;
+    endRow=Math.max(rows.length,1)+2;
     const ck=c=>c.b?kk(c.b.start,'a'):kk(c.t0,'b');
     cells.sort((x,y)=>ck(x)<ck(y)?-1:ck(x)>ck(y)?1:x.i-y.i);
     html+=cells.map(c=>{
       const on=c.i===sel?'on':'',col=`grid-column:${c.i+1}`;
-      if(c.b)return `<div class="brk ${on}" style="${col};grid-row:${ri(ck(c))}"><span>${esc(c.b.label||'Ricreazione')}</span><span>${c.b.start}–${fm(tm(c.b.start)+c.b.dur)}</span></div>`;
+      if(c.b){const w=(c.b.watch||[]).includes(c.i);return `<div class="brk ${w?'watch':''} ${on}" style="${col};grid-row:${ri(ck(c))}"><span>${esc(c.b.label||'Ricreazione')}${w?EYE:''}</span><span>${c.b.start}–${fm(tm(c.b.start)+c.b.dur)}</span></div>`}
       const {e,p}=c,cl=cls(e.cls),x=wn[e.id]||{},r0=ri(kk(c.t0,'b')),r1=ri(kk(c.t1,'b'));
       const mod=e.n>1?` · mod. ${p.m0===p.m1?p.m0+1:(p.m0+1)+'–'+(p.m1+1)}/${e.n}`:'';
       const act=c.pi>0?'continua':x.t?esc(x.t):'+ attività';
       return `<button class="les ${x.d?'done':''} ${on}" style="--c:${cl.color};${col};grid-row:${r0} / span ${r1-r0+1}" data-id="${e.id}"><div class="t">${fm(p.s)}–${fm(p.e)}${mod}</div><div class="n">${esc(cl.name)}</div><div class="a ${c.pi>0||!x.t?'ph':''}">${act}</div></button>`}).join('');
     html+=empty.map(i=>`<p class="empty ${i===sel?'on':''}" style="grid-column:${i+1};grid-row:2">Nessuna lezione</p>`).join('');
   }
+  DN.forEach((n,i)=>{
+    const d=ymd(addDays(wk,i)),on=i===sel?'on':'';
+    if(S.days.includes(i))html+=`<div class="dn ${on}" style="grid-column:${i+1};grid-row:${endRow}"><label for="dn${i}">Riunioni e altro</label><textarea id="dn${i}" data-d="${d}" rows="3">${esc(S.dayNotes[d]||'')}</textarea></div>`;
+    else html+=`<div class="offcol ${on}" style="grid-column:${i+1};grid-row:2 / ${endRow+1}">Giorno non lavorativo</div>`;
+  });
+  $('#week').style.setProperty('--cols',DN.map((n,i)=>S.days.includes(i)?'minmax(0,1fr)':'minmax(0,.3fr)').join(' '));
   $('#week').innerHTML=html;
   $('#wnote').value=S.weekNotes[key]||'';
 }
@@ -214,6 +240,7 @@ $('#prev').onclick=()=>{wk=addDays(wk,-7);render()};
 $('#next').onclick=()=>{wk=addDays(wk,7);render()};
 $('#today').onclick=()=>{wk=mon(new Date());sel=(new Date().getDay()+6)%7;render()};
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b){sel=+b.dataset.i;render()}};
+$('#week').addEventListener('input',e=>{const d=e.target.dataset&&e.target.dataset.d;if(!d)return;if(e.target.value.trim())S.dayNotes[d]=e.target.value;else delete S.dayNotes[d];save()});
 $('#wnote').oninput=e=>{S.weekNotes[ymd(wk)]=e.target.value;save()};
 
 // lezione
@@ -239,12 +266,13 @@ function renderSet(){
   const opts=sel=>S.classes.map(c=>`<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name||'(senza nome)')}</option>`).join('');
   const nopt=n=>[1,2,3,4].map(k=>`<option value="${k}" ${k===n?'selected':''}>${k} ${k>1?'moduli':'modulo'}</option>`).join('');
   $('#setBody').innerHTML=`<h3>Durata del modulo</h3><div class="row"><input type="number" id="modIn" min="10" max="180" step="5" value="${S.mod}" style="max-width:6rem"><span>minuti per ogni modulo. Le lezioni durano un multiplo di questo valore; se una lezione di più moduli arriva a una pausa, si interrompe e riprende dopo.</span></div>`+
+    `<h3>Giorni di scuola</h3><p class="sub">I giorni non spuntati restano visibili nel planner ma occupano meno spazio.</p><div class="chips">${DS.map((n,i)=>`<button data-wd="${i}" class="${S.days.includes(i)?'on':''}">${n}</button>`).join('')}</div>`+
     `<h3>Classi e materie</h3>`+
     S.classes.map(c=>`<div class="row" data-c="${c.id}"><input type="color" value="${c.color}" data-f="color" aria-label="Colore"><input type="text" value="${esc(c.name)}" data-f="name" placeholder="es. 3A Storia"><button data-del="c" aria-label="Elimina">✕</button></div>`).join('')+
     `<button data-addc>+ Aggiungi classe</button><h3>Lezioni per giorno</h3>`+
-    DN.map((n,i)=>`<h4>${n}</h4>`+S.sched.filter(e=>e.day===i).sort(byTime).map(e=>`<div class="row" data-s="${e.id}"><input type="time" value="${e.start}" data-f="start" aria-label="Inizio"><select data-f="n" aria-label="Durata">${nopt(e.n)}</select><span class="end">fino alle ${endOf(e)}</span><select data-f="cls" aria-label="Classe">${opts(e.cls)}</select><button data-del="s" aria-label="Elimina">✕</button></div>`).join('')+`<button data-add="${i}">+ Lezione</button>`).join('')+
-    `<h3>Ricreazione e pause</h3><p class="sub">Compaiono ogni giorno tra le lezioni, solo nei giorni in cui ce ne sono.</p>`+
-    [...S.breaks].sort(byTime).map(b=>`<div class="row" data-b="${b.id}"><input type="text" value="${esc(b.label)}" data-f="label" placeholder="Ricreazione"><input type="time" value="${b.start}" data-f="start" aria-label="Inizio"><input type="number" min="1" max="120" value="${b.dur}" data-f="dur" style="max-width:4.5rem" aria-label="Minuti"><span>min</span><button data-del="b" aria-label="Elimina">✕</button></div>`).join('')+
+    DN.map((n,i)=>!S.days.includes(i)?'':`<h4>${n}</h4>`+S.sched.filter(e=>e.day===i).sort(byTime).map(e=>`<div class="row" data-s="${e.id}"><input type="time" value="${e.start}" data-f="start" aria-label="Inizio"><select data-f="n" aria-label="Durata">${nopt(e.n)}</select><span class="end">fino alle ${endOf(e)}</span><select data-f="cls" aria-label="Classe">${opts(e.cls)}</select><button data-del="s" aria-label="Elimina">✕</button></div>`).join('')+`<button data-add="${i}">+ Lezione</button>`).join('')+
+    `<h3>Ricreazione e pause</h3><p class="sub">Compaiono ogni giorno tra le lezioni. Spunta i giorni in cui hai la sorveglianza: nel planner comparirà un occhio accanto al nome.</p>`+
+    [...S.breaks].sort(byTime).map(b=>`<div class="row" data-b="${b.id}"><input type="text" value="${esc(b.label)}" data-f="label" placeholder="Ricreazione"><input type="time" value="${b.start}" data-f="start" aria-label="Inizio"><input type="number" min="1" max="120" value="${b.dur}" data-f="dur" style="max-width:4.5rem" aria-label="Minuti"><span>min</span><button data-del="b" aria-label="Elimina">✕</button></div><div class="chips" data-bw="${b.id}"><span class="lb">Sorveglianza:</span>${S.days.map(i=>`<button data-w="${i}" class="${(b.watch||[]).includes(i)?'on':''}">${DS[i]}</button>`).join('')}</div>`).join('')+
     `<button data-addb>+ Aggiungi pausa</button>`;
 }
 $('#openSet').onclick=()=>{renderSet();$('#dSet').showModal()};
@@ -262,7 +290,9 @@ $('#setBody').addEventListener('input',e=>{
 $('#setBody').addEventListener('change',e=>{if(e.target.id==='modIn'||['start','n','cls'].includes(e.target.dataset.f))renderSet()});
 $('#setBody').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  if('addc' in b.dataset){S.classes.push({id:uid(),name:'',color:PAL[S.classes.length%PAL.length]})}
+  if(b.dataset.w!==undefined){const br=S.breaks.find(x=>x.id===b.parentElement.dataset.bw),d=+b.dataset.w;if(br){const w=br.watch||[];br.watch=w.includes(d)?w.filter(x=>x!==d):[...w,d]}}
+  else if(b.dataset.wd!==undefined){const d=+b.dataset.wd;if(S.days.includes(d)){if(S.days.length>1)S.days=S.days.filter(x=>x!==d)}else S.days=[...S.days,d].sort((x,y)=>x-y)}
+  else if('addc' in b.dataset){S.classes.push({id:uid(),name:'',color:PAL[S.classes.length%PAL.length]})}
   else if('addb' in b.dataset){S.breaks.push({id:uid(),label:'Ricreazione',start:'10:50',dur:10})}
   else if(b.dataset.add!==undefined){
     if(!S.classes.length){alert('Crea prima almeno una classe.');return}
